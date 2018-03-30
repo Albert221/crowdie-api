@@ -21,6 +21,8 @@ func NewRepository(mongoURL, database string) *MongoRepository {
 		log.Panicf("Cannot connect to '%s': %s", mongoURL, err)
 	}
 
+	s.SetMode(mgo.Monotonic, true)
+
 	return &MongoRepository{
 		db: s.DB(database),
 	}
