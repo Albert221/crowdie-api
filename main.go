@@ -42,6 +42,14 @@ func setupHttp(port string) *http.Server {
 		Methods("GET").
 		Name("group.get")
 
+	r.HandleFunc("/member/{id}/role", api.UpdateMemberRole).
+		Methods("PATCH").
+		Name("member.updateRole")
+
+	r.HandleFunc("/member/{id}/coords-bit", api.SendMemberCoordBit).
+		Methods("PATCH").
+		Name("member.coordsBit")
+
 	return &http.Server{
 		Handler:      r,
 		Addr:         fmt.Sprintf("0.0.0.0:%s", port),
