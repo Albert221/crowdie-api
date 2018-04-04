@@ -38,9 +38,17 @@ func getEnvs() (r map[string]string) {
 func setupHttp(port string) *http.Server {
 	r := mux.NewRouter()
 
+	r.HandleFunc("/group", api.NewGroup).
+		Methods("POST").
+		Name("group.create")
+
 	r.HandleFunc("/group/{id}", api.GetGroup).
 		Methods("GET").
 		Name("group.get")
+
+	r.HandleFunc("/group/{id}/member", api.AddMemberToGroup).
+		Methods("POST").
+		Name("group.addMember")
 
 	r.HandleFunc("/member/{id}/role", api.UpdateMemberRole).
 		Methods("PATCH").
@@ -49,6 +57,10 @@ func setupHttp(port string) *http.Server {
 	r.HandleFunc("/member/{id}/coords-bit", api.SendMemberCoordBit).
 		Methods("PATCH").
 		Name("member.coordsBit")
+
+	r.HandleFunc("/member/{id}", api.KickMember).
+		Methods("DELETE").
+		Name("member.kick")
 
 	return &http.Server{
 		Handler:      r,

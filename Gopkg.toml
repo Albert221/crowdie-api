@@ -36,3 +36,7 @@
 [[constraint]]
   branch = "v2"
   name = "gopkg.in/mgo.v2"
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "0.2.0"

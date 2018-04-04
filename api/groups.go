@@ -12,6 +12,22 @@ import (
 
 var Repository domain.Repository
 
+func NewGroup(w http.ResponseWriter, r *http.Request) {
+	creator := createMemberFromRequest(r)
+
+	group, err := Repository.NewGroup(creator)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(group)
+}
+
 func GetGroup(w http.ResponseWriter, r *http.Request) {
 	v := mux.Vars(r)
 	id := v["id"]
@@ -22,6 +38,24 @@ func GetGroup(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(group)
+}
+
+func AddMemberToGroup(w http.ResponseWriter, r *http.Request) {
+	v := mux.Vars(r)
+	id := v["id"]
+	member := createMemberFromRequest(r)
+
+	group, err := Repository.AddMemberToGroup(id, member)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(group)
@@ -49,7 +83,12 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 	lat, _ := strconv.ParseFloat(r.PostFormValue("lat"), 32)
 	lng, _ := strconv.ParseFloat(r.PostFormValue("lng"), 32)
 
-	member, err := Repository.UpdateMemberCoordsBit(id, float32(lat), float32(lng), time.Now())
+	coords := domain.CoordsBit{
+		Lat: float32(lat),
+		Lng: float32(lng),
+		Time: time.Now(),
+	}
+	member, err := Repository.UpdateMemberCoordsBit(id, coords)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -58,4 +97,34 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(member)
+}
+
+func KickMember(w http.ResponseWriter, r *http.Request) {
+	v := mux.Vars(r)
+	id := v["id"]
+
+	group, err := Repository.KickMember(id)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(group)
+}
+
+func createMemberFromRequest(r *http.Request) domain.Member {
+	name := r.PostFormValue("name")
+	lat, _ := strconv.ParseFloat(r.PostFormValue("lat"), 32)
+	lng, _ := strconv.ParseFloat(r.PostFormValue("lng"), 32)
+
+	return domain.Member{
+		Name: name,
+		CoordsBit: domain.CoordsBit{
+			Lat: float32(lat),
+			Lng: float32(lng),
+			Time: time.Now(),
+		},
+	}
 }

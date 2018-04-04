@@ -5,13 +5,16 @@ import (
 	"log"
 	"gopkg.in/mgo.v2/bson"
 	"fmt"
-	"time"
+	"github.com/google/uuid"
 )
 
 type Repository interface {
+	NewGroup(creator Member) (*Group, error)
 	GetGroupById(id string) (*Group, error)
+	AddMemberToGroup(groupId string, member Member) (*Group, error)
 	UpdateMemberRole(id string, role int8) (*Member, error)
-	UpdateMemberCoordsBit(id string, lat, lng float32, time time.Time) (*Member, error)
+	UpdateMemberCoordsBit(id string, coords CoordsBit) (*Member, error)
+	KickMember(id string) (*Group, error)
 }
 
 type MongoRepository struct {
@@ -31,6 +34,25 @@ func NewRepository(mongoURL, database string) *MongoRepository {
 	}
 }
 
+func (r MongoRepository) NewGroup(creator Member) (*Group, error) {
+	creator.Id = uuid.New().String()
+	creator.Role = ADMIN
+
+	group := Group{
+		Id: uuid.New().String(),
+		Members: []Member{
+			creator,
+		},
+	}
+
+	err := r.db.C("groups").Insert(group)
+	if err != nil {
+		return nil, fmt.Errorf("can't insert new group: %s", err)
+	}
+
+	return &group, nil
+}
+
 func (r MongoRepository) GetGroupById(id string) (*Group, error) {
 	group := Group{}
 
@@ -42,6 +64,25 @@ func (r MongoRepository) GetGroupById(id string) (*Group, error) {
 	}
 
 	return &group, nil
+}
+
+func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, error) {
+	member.Id = uuid.New().String()
+
+	change := mgo.Change{
+		Update: bson.M{"$push": bson.M{"members": member}},
+		ReturnNew: true,
+	}
+
+	var updatedGroup Group
+	_, err := r.db.C("groups").Find(bson.M{"id": id}).Apply(change, &updatedGroup)
+	if err == mgo.ErrNotFound {
+		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &updatedGroup, nil
 }
 
 func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error) {
@@ -67,15 +108,9 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error)
 	return nil, fmt.Errorf("weird error, Id cannot be found")
 }
 
-func (r MongoRepository) UpdateMemberCoordsBit(id string, lat, lng float32, time time.Time) (*Member, error) {
-	coordsBit := CoordsBit{
-		Lat: lat,
-		Lng: lng,
-		Time: time,
-	}
-
+func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Member, error) {
 	change := mgo.Change{
-		Update: bson.M{"$set": bson.M{"members.$.coordsbit": coordsBit}},
+		Update: bson.M{"$set": bson.M{"members.$.coordsbit": coords}},
 		ReturnNew: true,
 	}
 
@@ -94,4 +129,21 @@ func (r MongoRepository) UpdateMemberCoordsBit(id string, lat, lng float32, time
 	}
 
 	return nil, fmt.Errorf("weird error, Id cannot be found")
+}
+
+func (r MongoRepository) KickMember(id string) (*Group, error) {
+	change := mgo.Change{
+		Update: bson.M{"$pull": bson.M{"members": bson.M{"id": id}}},
+		ReturnNew: true,
+	}
+
+	var updatedGroup Group
+	_, err := r.db.C("groups").Find(bson.M{"members.id": id}).Apply(change, &updatedGroup)
+	if err == mgo.ErrNotFound {
+		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &updatedGroup, nil
 }

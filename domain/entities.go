@@ -2,6 +2,11 @@ package domain
 
 import "time"
 
+const (
+	USER = 0
+	ADMIN = 1
+)
+
 type Group struct {
 	Id      string   `json:"id"`
 	Members []Member `json:"members"`
