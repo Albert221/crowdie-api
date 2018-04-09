@@ -3,7 +3,7 @@ package domain
 import "time"
 
 const (
-	USER = 0
+	USER  = 0
 	ADMIN = 1
 )
 
@@ -17,6 +17,7 @@ type Member struct {
 	Name      string    `json:"name"`
 	Role      int8      `json:"role"`
 	CoordsBit CoordsBit `json:"coordsBit"`
+	AndroidId string    `json:"androidId"`
 }
 
 type CoordsBit struct {

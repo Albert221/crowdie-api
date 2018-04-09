@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+	"io/ioutil"
 )
 
 var Repository domain.Repository
@@ -84,8 +85,8 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 	lng, _ := strconv.ParseFloat(r.PostFormValue("lng"), 32)
 
 	coords := domain.CoordsBit{
-		Lat: float32(lat),
-		Lng: float32(lng),
+		Lat:  float32(lat),
+		Lng:  float32(lng),
 		Time: time.Now(),
 	}
 	member, err := Repository.UpdateMemberCoordsBit(id, coords)
@@ -115,16 +116,23 @@ func KickMember(w http.ResponseWriter, r *http.Request) {
 }
 
 func createMemberFromRequest(r *http.Request) domain.Member {
-	name := r.PostFormValue("name")
-	lat, _ := strconv.ParseFloat(r.PostFormValue("lat"), 32)
-	lng, _ := strconv.ParseFloat(r.PostFormValue("lng"), 32)
+	member := make(map[string]interface{})
+
+	body, _ := ioutil.ReadAll(r.Body)
+	json.Unmarshal(body, &member)
+
+	name := member["name"].(string)
+	lat := float32(member["lat"].(float64))
+	lng := float32(member["lng"].(float64))
+	androidId := member["androidId"].(string)
 
 	return domain.Member{
 		Name: name,
 		CoordsBit: domain.CoordsBit{
-			Lat: float32(lat),
-			Lng: float32(lng),
+			Lat:  lat,
+			Lng:  lng,
 			Time: time.Now(),
 		},
+		AndroidId: androidId,
 	}
 }

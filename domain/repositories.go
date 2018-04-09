@@ -70,14 +70,14 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	member.Id = uuid.New().String()
 
 	change := mgo.Change{
-		Update: bson.M{"$push": bson.M{"members": member}},
+		Update:    bson.M{"$push": bson.M{"members": member}},
 		ReturnNew: true,
 	}
 
 	var updatedGroup Group
 	_, err := r.db.C("groups").Find(bson.M{"id": id}).Apply(change, &updatedGroup)
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+		return nil, fmt.Errorf("group with ID '%s' does not exist", id)
 	} else if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 
 func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error) {
 	change := mgo.Change{
-		Update: bson.M{"$set": bson.M{"members.$.role": role}},
+		Update:    bson.M{"$set": bson.M{"members.$.role": role}},
 		ReturnNew: true,
 	}
 
@@ -110,7 +110,7 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error)
 
 func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Member, error) {
 	change := mgo.Change{
-		Update: bson.M{"$set": bson.M{"members.$.coordsbit": coords}},
+		Update:    bson.M{"$set": bson.M{"members.$.coordsbit": coords}},
 		ReturnNew: true,
 	}
 
@@ -133,7 +133,7 @@ func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Me
 
 func (r MongoRepository) KickMember(id string) (*Group, error) {
 	change := mgo.Change{
-		Update: bson.M{"$pull": bson.M{"members": bson.M{"id": id}}},
+		Update:    bson.M{"$pull": bson.M{"members": bson.M{"id": id}}},
 		ReturnNew: true,
 	}
 
