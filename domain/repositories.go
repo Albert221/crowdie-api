@@ -74,15 +74,35 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 		ReturnNew: true,
 	}
 
-	var updatedGroup Group
-	_, err := r.db.C("groups").Find(bson.M{"id": id}).Apply(change, &updatedGroup)
+	var group Group
+	query := r.db.C("groups").Find(bson.M{"id": id})
+	query.One(&group)
+
+	var existingMemberId string
+
+	for _, groupMember := range group.Members {
+		if groupMember.AndroidId == member.AndroidId {
+			existingMemberId = groupMember.Id
+
+			break
+		}
+	}
+
+	var err error
+
+	if existingMemberId != "" {
+		_, err = r.UpdateMemberCoordsBit(existingMemberId, member.CoordsBit)
+	} else {
+		_, err = query.Apply(change, &group)
+	}
+
 	if err == mgo.ErrNotFound {
 		return nil, fmt.Errorf("group with ID '%s' does not exist", id)
 	} else if err != nil {
 		return nil, err
 	}
 
-	return &updatedGroup, nil
+	return &group, nil
 }
 
 func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error) {
