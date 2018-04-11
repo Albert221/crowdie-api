@@ -67,7 +67,7 @@ func UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	id := v["id"]
 	role, _ := strconv.ParseInt(r.PostFormValue("role"), 10, 8)
 
-	member, err := Repository.UpdateMemberRole(id, int8(role))
+	group, err := Repository.UpdateMemberRole(id, int8(role))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -75,7 +75,7 @@ func UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	encoder := json.NewEncoder(w)
-	encoder.Encode(member)
+	encoder.Encode(group)
 }
 
 func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 		Lng:  float32(lng),
 		Time: time.Now(),
 	}
-	member, err := Repository.UpdateMemberCoordsBit(id, coords)
+	group, err := Repository.UpdateMemberCoordsBit(id, coords)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -97,7 +97,7 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	encoder := json.NewEncoder(w)
-	encoder.Encode(member)
+	encoder.Encode(group)
 }
 
 func KickMember(w http.ResponseWriter, r *http.Request) {

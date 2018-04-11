@@ -12,8 +12,8 @@ type Repository interface {
 	NewGroup(creator Member) (*Group, error)
 	GetGroupById(id string) (*Group, error)
 	AddMemberToGroup(groupId string, member Member) (*Group, error)
-	UpdateMemberRole(id string, role int8) (*Member, error)
-	UpdateMemberCoordsBit(id string, coords CoordsBit) (*Member, error)
+	UpdateMemberRole(id string, role int8) (*Group, error)
+	UpdateMemberCoordsBit(id string, coords CoordsBit) (*Group, error)
 	KickMember(id string) (*Group, error)
 }
 
@@ -67,34 +67,23 @@ func (r MongoRepository) GetGroupById(id string) (*Group, error) {
 }
 
 func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, error) {
-	member.Id = uuid.New().String()
-
-	change := mgo.Change{
-		Update:    bson.M{"$push": bson.M{"members": member}},
-		ReturnNew: true,
-	}
-
 	var group Group
 	query := r.db.C("groups").Find(bson.M{"id": id})
 	query.One(&group)
 
-	var existingMemberId string
-
-	for _, groupMember := range group.Members {
-		if groupMember.AndroidId == member.AndroidId {
-			existingMemberId = groupMember.Id
-
-			break
-		}
-	}
+	exists, id := r.memberWithAndroidIdExists(&group, member.AndroidId)
 
 	var err error
-
-	if existingMemberId != "" {
-		_, err = r.UpdateMemberCoordsBit(existingMemberId, member.CoordsBit)
-	} else {
-		_, err = query.Apply(change, &group)
+	if exists {
+		return r.UpdateMemberCoordsBit(id, member.CoordsBit)
 	}
+
+	member.Id = uuid.New().String()
+	change := mgo.Change{
+		Update:    bson.M{"$push": bson.M{"members": member}},
+		ReturnNew: true,
+	}
+	_, err = query.Apply(change, &group)
 
 	if err == mgo.ErrNotFound {
 		return nil, fmt.Errorf("group with ID '%s' does not exist", id)
@@ -105,50 +94,48 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	return &group, nil
 }
 
-func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Member, error) {
+func (r MongoRepository) memberWithAndroidIdExists(group *Group, androidId string) (bool, string) {
+	for _, member := range group.Members {
+		if member.AndroidId == androidId {
+			return true, member.Id
+		}
+	}
+
+	return false, ""
+}
+
+func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) {
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"members.$.role": role}},
 		ReturnNew: true,
 	}
 
-	var updatedGroup Group
-	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &updatedGroup)
+	var group Group
+	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
 	} else if err != nil {
 		return nil, err
 	}
 
-	for _, member := range updatedGroup.Members {
-		if member.Id == id {
-			return &member, nil
-		}
-	}
-
-	return nil, fmt.Errorf("weird error, Id cannot be found")
+	return &group, nil
 }
 
-func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Member, error) {
+func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Group, error) {
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"members.$.coordsbit": coords}},
 		ReturnNew: true,
 	}
 
-	var updatedGroup Group
-	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &updatedGroup)
+	var group Group
+	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
 	} else if err != nil {
 		return nil, err
 	}
 
-	for _, member := range updatedGroup.Members {
-		if member.Id == id {
-			return &member, nil
-		}
-	}
-
-	return nil, fmt.Errorf("weird error, Id cannot be found")
+	return &group, nil
 }
 
 func (r MongoRepository) KickMember(id string) (*Group, error) {
