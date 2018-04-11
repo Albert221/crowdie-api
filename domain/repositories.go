@@ -24,7 +24,7 @@ type MongoRepository struct {
 func NewRepository(mongoURL, database string) *MongoRepository {
 	s, err := mgo.Dial(mongoURL)
 	if err != nil {
-		log.Panicf("Cannot connect to '%s': %s", mongoURL, err)
+		log.Panicf("cannot connect to '%s': %s", mongoURL, err)
 	}
 
 	s.SetMode(mgo.Monotonic, true)
@@ -50,6 +50,8 @@ func (r MongoRepository) NewGroup(creator Member) (*Group, error) {
 		return nil, fmt.Errorf("can't insert new group: %s", err)
 	}
 
+	log.Printf("created new group (id: %s)\n", group.Id)
+
 	return &group, nil
 }
 
@@ -71,11 +73,13 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	query := r.db.C("groups").Find(bson.M{"id": id})
 	query.One(&group)
 
-	exists, id := r.memberWithAndroidIdExists(&group, member.AndroidId)
+	exists, memberId := r.memberWithAndroidIdExists(&group, member.AndroidId)
 
 	var err error
 	if exists {
-		return r.UpdateMemberCoordsBit(id, member.CoordsBit)
+		log.Printf("adding lost member to group (id: %s, member id: %s)\n", id, memberId)
+
+		return r.UpdateMemberCoordsBit(memberId, member.CoordsBit)
 	}
 
 	member.Id = uuid.New().String()
@@ -90,6 +94,8 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	} else if err != nil {
 		return nil, err
 	}
+
+	log.Printf("added new member to group (id: %s, member id: %s)\n", id, member.Id)
 
 	return &group, nil
 }
@@ -118,6 +124,8 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) 
 		return nil, err
 	}
 
+	log.Printf("updated role of member to %s (member id: %s)\n", role, id)
+
 	return &group, nil
 }
 
@@ -144,13 +152,15 @@ func (r MongoRepository) KickMember(id string) (*Group, error) {
 		ReturnNew: true,
 	}
 
-	var updatedGroup Group
-	_, err := r.db.C("groups").Find(bson.M{"members.id": id}).Apply(change, &updatedGroup)
+	var group Group
+	_, err := r.db.C("groups").Find(bson.M{"members.id": id}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
 	} else if err != nil {
 		return nil, err
 	}
 
-	return &updatedGroup, nil
+	log.Printf("kicked member from group (id: %s, member id: %s)", group.Id, id)
+
+	return &group, nil
 }

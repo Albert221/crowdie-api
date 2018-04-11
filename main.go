@@ -12,6 +12,10 @@ import (
 )
 
 func main() {
+	f, _ := os.OpenFile("log.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0664)
+	log.SetOutput(f)
+	defer f.Close()
+
 	envs := getEnvs()
 
 	api.Repository = domain.NewRepository(
