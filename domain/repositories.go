@@ -60,7 +60,7 @@ func (r MongoRepository) GetGroupById(id string) (*Group, error) {
 
 	err := r.db.C("groups").Find(bson.M{"id": id}).One(&group)
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("group with ID '%s' does not exist", id)
+		return nil, GroupNotExists
 	} else if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	_, err = query.Apply(change, &group)
 
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("group with ID '%s' does not exist", id)
+		return nil, GroupNotExists
 	} else if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) 
 	var group Group
 	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+		return nil, MemberNotExists
 	} else if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Gr
 	var group Group
 	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+		return nil, MemberNotExists
 	} else if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (r MongoRepository) KickMember(id string) (*Group, error) {
 	var group Group
 	_, err := r.db.C("groups").Find(bson.M{"members.id": id}).Apply(change, &group)
 	if err == mgo.ErrNotFound {
-		return nil, fmt.Errorf("member with ID '%s' does not exist", id)
+		return nil, MemberNotExists
 	} else if err != nil {
 		return nil, err
 	}

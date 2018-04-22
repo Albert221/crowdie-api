@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"time"
+	"errors"
+)
 
 const (
 	USER  = 0
@@ -25,3 +28,9 @@ type CoordsBit struct {
 	Lng  float32   `json:"lng"`
 	Time time.Time `json:"time"`
 }
+
+var (
+	GroupNotExists = errors.New("group does not exist")
+
+	MemberNotExists = errors.New("member does not exist")
+)

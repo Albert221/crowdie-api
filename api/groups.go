@@ -34,9 +34,12 @@ func GetGroup(w http.ResponseWriter, r *http.Request) {
 	id := v["id"]
 
 	group, err := Repository.GetGroupById(id)
-	if err != nil {
-		log.Println(err)
+	if err == domain.GroupNotExists {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -50,7 +53,10 @@ func AddMemberToGroup(w http.ResponseWriter, r *http.Request) {
 	member := createMemberFromRequest(r)
 
 	group, err := Repository.AddMemberToGroup(id, member)
-	if err != nil {
+	if err == domain.GroupNotExists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -68,7 +74,10 @@ func UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	role, _ := strconv.ParseInt(r.PostFormValue("role"), 10, 8)
 
 	group, err := Repository.UpdateMemberRole(id, int8(role))
-	if err != nil {
+	if err == domain.MemberNotExists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -90,7 +99,10 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 		Time: time.Now(),
 	}
 	group, err := Repository.UpdateMemberCoordsBit(id, coords)
-	if err != nil {
+	if err == domain.MemberNotExists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -105,7 +117,10 @@ func KickMember(w http.ResponseWriter, r *http.Request) {
 	id := v["id"]
 
 	group, err := Repository.KickMember(id)
-	if err != nil {
+	if err == domain.MemberNotExists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
