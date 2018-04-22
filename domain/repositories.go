@@ -124,7 +124,7 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) 
 		return nil, err
 	}
 
-	log.Printf("updated role of member to %s (member id: %s)\n", role, id)
+	log.Printf("updated role of member to %d (member id: %s)\n", role, id)
 
 	return &group, nil
 }
