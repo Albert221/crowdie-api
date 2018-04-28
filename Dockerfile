@@ -13,4 +13,5 @@ COPY . .
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
 RUN dep ensure
-RUN go run main.go
+
+CMD ["go", "run", "main.go"]
