@@ -3,26 +3,26 @@ package main
 import (
 	"github.com/gorilla/mux"
 	"net/http"
-	"log"
 	"time"
 	"wolszon.me/groupie/api"
 	"wolszon.me/groupie/domain"
 	"fmt"
 	"os"
+	"github.com/google/logger"
 )
 
 func main() {
-	f, _ := os.OpenFile("log.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0664)
-	log.SetOutput(f)
-	defer f.Close()
+	logFile, _ := os.OpenFile("log.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0664)
+	defer logFile.Close()
+
+	logger.Init("Main", false, false, logFile)
 
 	envs := getEnvs()
 
-	api.Repository = domain.NewRepository(
-		envs["GROUPIE_MONGO_URL"], envs["GROUPIE_DATABASE"])
+	api.Repository = domain.NewRepository(envs["GROUPIE_MONGO_URL"], envs["GROUPIE_DATABASE"])
 
 	srv := setupHttp(envs["GROUPIE_PORT"])
-	log.Fatal(srv.ListenAndServe())
+	logger.Fatal(srv.ListenAndServe())
 }
 
 func getEnvs() (r map[string]string) {
@@ -31,7 +31,7 @@ func getEnvs() (r map[string]string) {
 
 	for _, env := range required {
 		if os.Getenv(env) == "" {
-			log.Panicf("Environment variable %s is missing", env)
+			logger.Errorf("Environment variable %s is missing", env)
 		}
 		r[env] = os.Getenv(env)
 	}

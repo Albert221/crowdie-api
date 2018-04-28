@@ -3,12 +3,12 @@ package api
 import (
 	"net/http"
 	"github.com/gorilla/mux"
-	"log"
 	"wolszon.me/groupie/domain"
 	"encoding/json"
 	"strconv"
 	"time"
 	"io/ioutil"
+	"github.com/google/logger"
 )
 
 var Repository domain.Repository
@@ -16,9 +16,9 @@ var Repository domain.Repository
 func NewGroup(w http.ResponseWriter, r *http.Request) {
 	creator := createMemberFromRequest(r)
 
-	group, err := Repository.NewGroup(creator)
+	group, err := Repository.CreateGroup(creator)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -38,7 +38,7 @@ func GetGroup(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -57,7 +57,7 @@ func AddMemberToGroup(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +78,7 @@ func UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -103,7 +103,7 @@ func SendMemberCoordBit(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -121,7 +121,7 @@ func KickMember(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -137,17 +137,9 @@ func createMemberFromRequest(r *http.Request) domain.Member {
 	json.Unmarshal(body, &member)
 
 	name := member["name"].(string)
+	androidId := member["androidId"].(string)
 	lat := float32(member["lat"].(float64))
 	lng := float32(member["lng"].(float64))
-	androidId := member["androidId"].(string)
 
-	return domain.Member{
-		Name: name,
-		CoordsBit: domain.CoordsBit{
-			Lat:  lat,
-			Lng:  lng,
-			Time: time.Now(),
-		},
-		AndroidId: androidId,
-	}
+	return domain.NewMember(name, androidId, lat, lng)
 }
