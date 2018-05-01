@@ -37,6 +37,7 @@ func NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := bson.M{
+		"yourId": creator.Id,
 		"group": group.Export(),
 		"token": token,
 	}
@@ -79,9 +80,21 @@ func AddMemberToGroup(w http.ResponseWriter, r *http.Request) {
 	id := v["id"]
 	member := createMemberFromRequest(r)
 
-	group, err := Repository.AddMemberToGroup(id, member)
+	existsFlag := new(bool)
+	group, err := Repository.AddMemberToGroup(id, member, func() (domain.SecurityPile, error) {
+		secPile, err := getSecurityPileFromJWT(r)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return secPile, err
+		}
+
+		return secPile, nil
+	}, existsFlag)
 	if err == domain.GroupNotExists {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err == domain.NoSufficientPermissions {
+		w.WriteHeader(http.StatusForbidden)
 		return
 	} else if err != nil {
 		logger.Error(err)
@@ -89,10 +102,26 @@ func AddMemberToGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := bson.M{
+		"group": group.Export(),
+	}
+
+	if !*existsFlag {
+		token, err := ApiTokenManager.CreateToken(member.Secret, member.AndroidId)
+		if err != nil {
+			logger.Warning(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		response["yourId"] = member.Id
+		response["token"] = token
+	}
+
 	w.WriteHeader(http.StatusCreated)
 
 	encoder := json.NewEncoder(w)
-	encoder.Encode(group.Export())
+	encoder.Encode(response)
 }
 
 func UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
