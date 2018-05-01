@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/gbrlsnchs/jwt"
+  packages = ["."]
+  revision = "fd3b16eda068e8d51d245b07019854d63dc4b591"
+  version = "v0.5.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/google/logger"
   packages = ["."]
@@ -50,6 +56,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d9117f6d941ab48b87df20ee1670640d5cadd80a0e2980c00569ab0afd8352a5"
+  inputs-digest = "cd0fb50aa9f7e4575deeec8d72bd1b2d5be3167726111c057468c05298cd4935"
   solver-name = "gps-cdcl"
   solver-version = 1

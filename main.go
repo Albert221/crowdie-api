@@ -21,17 +21,17 @@ func main() {
 
 	api.Repository = domain.NewRepository(envs["GROUPIE_MONGO_URL"], envs["GROUPIE_DATABASE"])
 
-	srv := setupHttp(envs["GROUPIE_PORT"])
+	srv := setupHttp(envs["GROUPIE_PORT"], envs["GROUPIE_JWT_SECRET"])
 	logger.Fatal(srv.ListenAndServe())
 }
 
 func getEnvs() (r map[string]string) {
 	r = make(map[string]string)
-	required := []string{"GROUPIE_PORT", "GROUPIE_MONGO_URL", "GROUPIE_DATABASE"}
+	required := []string{"GROUPIE_PORT", "GROUPIE_MONGO_URL", "GROUPIE_DATABASE", "GROUPIE_JWT_SECRET"}
 
 	for _, env := range required {
 		if os.Getenv(env) == "" {
-			logger.Errorf("Environment variable %s is missing", env)
+			logger.Fatalf("Environment variable %s is missing", env)
 		}
 		r[env] = os.Getenv(env)
 	}
@@ -39,10 +39,14 @@ func getEnvs() (r map[string]string) {
 	return
 }
 
-func setupHttp(port string) *http.Server {
+func setupHttp(port, jwtSecret string) *http.Server {
 	r := mux.NewRouter()
 
+	tokenManager := api.NewTokenManager(jwtSecret)
+	api.ApiTokenManager = tokenManager
+
 	apiRoutes := r.PathPrefix("/api/v1").Subrouter()
+	apiRoutes.Use(tokenManager.TokenMiddleware)
 
 	apiRoutes.HandleFunc("/group", api.NewGroup).
 		Methods("POST").

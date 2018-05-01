@@ -44,3 +44,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/google/logger"
+
+[[constraint]]
+  name = "github.com/gbrlsnchs/jwt"
+  version = "0.5.0"

@@ -7,18 +7,25 @@ import (
 	"github.com/google/logger"
 )
 
-type Repository interface {
-	CreateGroup(creator Member) (*Group, error)
-	GetGroupById(id string) (*Group, error)
-	AddMemberToGroup(groupId string, member Member) (*Group, error)
-	UpdateMemberRole(id string, role int8) (*Group, error)
-	UpdateMemberCoordsBit(id string, coords CoordsBit) (*Group, error)
-	KickMember(id string) (*Group, error)
-}
+type (
+	Repository interface {
+		CreateGroup(creator Member) (*Group, error)
+		GetGroupById(id string, sec SecurityPile) (*Group, error)
+		AddMemberToGroup(groupId string, member Member) (*Group, error)
+		UpdateMemberRole(id string, role int8, sec SecurityPile) (*Group, error)
+		UpdateMemberCoordsBit(id string, coords CoordsBit, sec SecurityPile) (*Group, error)
+		KickMember(id string, sec SecurityPile) (*Group, error)
+	}
 
-type MongoRepository struct {
-	db *mgo.Database
-}
+	MongoRepository struct {
+		db *mgo.Database
+	}
+
+	SecurityPile struct {
+		Secret    string
+		AndroidId string
+	}
+)
 
 func NewRepository(mongoURL, database string) *MongoRepository {
 	s, err := mgo.Dial(mongoURL)
@@ -47,13 +54,17 @@ func (r MongoRepository) CreateGroup(creator Member) (*Group, error) {
 	return &group, nil
 }
 
-func (r MongoRepository) GetGroupById(id string) (*Group, error) {
+func (r MongoRepository) GetGroupById(id string, sec SecurityPile) (*Group, error) {
 	var group Group
 	err := r.db.C("groups").Find(bson.M{"id": id}).One(&group)
 	if err == mgo.ErrNotFound {
 		return nil, GroupNotExists
 	} else if err != nil {
 		return nil, err
+	}
+
+	if !checkMemberPermissionsToGroup(&group, sec) {
+		return nil, NoSufficientPermissions
 	}
 
 	return &group, nil
@@ -67,7 +78,7 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	if exists, memberId := r.memberWithAndroidIdExists(&group, member.AndroidId); exists {
 		logger.Infof("adding lost member (%s) to group (%s)", memberId, id)
 
-		return r.UpdateMemberCoordsBit(memberId, member.CoordsBit)
+		return r.UpdateMemberCoordsBit(memberId, member.CoordsBit, SecurityPile{})
 	}
 
 	change := mgo.Change{
@@ -87,14 +98,21 @@ func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, err
 	return &group, nil
 }
 
-func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) {
+func (r MongoRepository) UpdateMemberRole(id string, role int8, sec SecurityPile) (*Group, error) {
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"members.$.role": role}},
 		ReturnNew: true,
 	}
 
 	var group Group
-	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
+	query := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}})
+	query.One(&group)
+
+	if !checkAdminPermissions(&group, sec) {
+		return nil, NoSufficientPermissions
+	}
+
+	_, err := query.Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, MemberNotExists
 	} else if err != nil {
@@ -106,14 +124,27 @@ func (r MongoRepository) UpdateMemberRole(id string, role int8) (*Group, error) 
 	return &group, nil
 }
 
-func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Group, error) {
+func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit, sec SecurityPile) (*Group, error) {
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"members.$.coordsbit": coords}},
 		ReturnNew: true,
 	}
 
 	var group Group
-	_, err := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}}).Apply(change, &group)
+	query := r.db.C("groups").Find(bson.M{"members": bson.M{"$elemMatch": bson.M{"id": id}}})
+
+	err := query.One(&group)
+	if err == mgo.ErrNotFound {
+		return nil, MemberNotExists
+	} else if err != nil {
+		return nil, err
+	}
+
+	if !verifyMember(id, &group, sec) {
+		return nil, NoSufficientPermissions
+	}
+
+	_, err = query.Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, MemberNotExists
 	} else if err != nil {
@@ -124,14 +155,25 @@ func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit) (*Gr
 }
 
 // TODO: If member is last admin, give a random member an admin
-func (r MongoRepository) KickMember(id string) (*Group, error) {
+func (r MongoRepository) KickMember(id string, sec SecurityPile) (*Group, error) {
 	change := mgo.Change{
 		Update:    bson.M{"$pull": bson.M{"members": bson.M{"id": id}}},
 		ReturnNew: true,
 	}
 
 	var group Group
-	_, err := r.db.C("groups").Find(bson.M{"members.id": id}).Apply(change, &group)
+	query := r.db.C("groups").Find(bson.M{"members.id": id})
+	query.One(&group)
+
+	if verifyMember(id, &group, sec) {
+		// Everything's right
+	} else if checkAdminPermissions(&group, sec) {
+		// Everything's right too
+	} else {
+		return nil, NoSufficientPermissions
+	}
+
+	_, err := query.Apply(change, &group)
 	if err == mgo.ErrNotFound {
 		return nil, MemberNotExists
 	} else if err != nil {
@@ -151,4 +193,38 @@ func (r MongoRepository) memberWithAndroidIdExists(group *Group, androidId strin
 	}
 
 	return false, ""
+}
+
+func checkMemberPermissionsToGroup(group *Group, sec SecurityPile) bool {
+	for _, member := range group.Members {
+		if member.Secret == sec.Secret && member.AndroidId == sec.AndroidId {
+			return true
+		}
+	}
+
+	return false
+}
+
+func verifyMember(memberId string, group *Group, sec SecurityPile) bool {
+	for _, member := range group.Members {
+		if member.Id == memberId {
+			if member.Secret == sec.Secret && member.AndroidId == sec.AndroidId {
+				return true
+			}
+
+			return false
+		}
+	}
+
+	return false
+}
+
+func checkAdminPermissions(group *Group, sec SecurityPile) bool {
+	for _, member := range group.Members {
+		if member.AndroidId == sec.AndroidId && member.Secret == sec.Secret {
+			return member.Role == ADMIN
+		}
+	}
+
+	return false
 }
