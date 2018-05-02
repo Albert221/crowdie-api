@@ -1,17 +1,18 @@
 package api
 
 import (
-	"net/http"
-	"github.com/gorilla/mux"
-	"wolszon.me/groupie/domain"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"time"
-	"io/ioutil"
-	"github.com/google/logger"
+
 	"github.com/gbrlsnchs/jwt"
-	"fmt"
+	"github.com/google/logger"
+	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2/bson"
+	"wolszon.me/groupie/domain"
 )
 
 var (
@@ -31,15 +32,15 @@ func NewGroup(w http.ResponseWriter, r *http.Request) {
 
 	token, err := ApiTokenManager.CreateToken(creator.Secret, creator.AndroidId)
 	if err != nil {
-		logger.Warning(err)
+		logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	response := bson.M{
 		"yourId": creator.Id,
-		"group": group.Export(),
-		"token": token,
+		"group":  group.Export(),
+		"token":  token,
 	}
 
 	w.WriteHeader(http.StatusCreated)
