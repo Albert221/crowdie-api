@@ -4,6 +4,7 @@ import (
 	"time"
 	"errors"
 	"github.com/google/uuid"
+	"wolszon.me/groupie/utils"
 )
 
 const (
@@ -54,8 +55,7 @@ func (g Group) Export() Group {
 }
 
 func NewMember(name, androidId string, lat, lng float32) Member {
-	// TODO: Generate secure random string
-	secret := ""
+	secret := utils.GenerateRandomSecret()
 
 	return Member{
 		Id:        uuid.New().String(),
