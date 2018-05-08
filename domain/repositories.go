@@ -8,12 +8,10 @@ import (
 )
 
 type (
-	PileProviderCallback func() (SecurityPile, error)
-
 	Repository interface {
 		CreateGroup(creator Member) (*Group, error)
 		GetGroupById(id string, sec SecurityPile) (*Group, error)
-		AddMemberToGroup(groupId string, member Member, pileProviderCallback PileProviderCallback, existsFlag *bool) (*Group, error)
+		AddMemberToGroup(groupId string, member Member) (*Group, error)
 		UpdateMemberRole(id string, role int8, sec SecurityPile) (*Group, error)
 		UpdateMemberCoordsBit(id string, coords CoordsBit, sec SecurityPile) (*Group, error)
 		KickMember(id string, sec SecurityPile) (*Group, error)
@@ -72,25 +70,16 @@ func (r MongoRepository) GetGroupById(id string, sec SecurityPile) (*Group, erro
 	return &group, nil
 }
 
-func (r MongoRepository) AddMemberToGroup(id string, member Member, pileProviderCallback PileProviderCallback, existsFlag *bool) (*Group, error) {
+func (r MongoRepository) AddMemberToGroup(id string, member Member) (*Group, error) {
 	var group Group
 	query := r.db.C("groups").Find(bson.M{"id": id})
 	query.One(&group)
 
-	if exists, memberId := r.memberWithAndroidIdExists(&group, member.AndroidId); exists {
-		*existsFlag = true
+	if r.memberWithAndroidIdExists(&group, member.AndroidId) {
+		logger.Infof("an attempt to join the group (%s) has been made by the user (android id: %s)", id, member.AndroidId)
 
-		sec, err := pileProviderCallback()
-		if err != nil || !verifyMember(memberId, &group, sec) {
-			return nil, NoSufficientPermissions
-		}
-
-		defer logger.Infof("added lost member (%s) to group (%s)", memberId, id)
-
-		return r.UpdateMemberCoordsBit(memberId, member.CoordsBit, sec)
+		return nil, NoSufficientPermissions
 	}
-
-	*existsFlag = false
 
 	change := mgo.Change{
 		Update:    bson.M{"$push": bson.M{"members": member}},
@@ -151,7 +140,7 @@ func (r MongoRepository) UpdateMemberCoordsBit(id string, coords CoordsBit, sec 
 		return nil, err
 	}
 
-	if !verifyMember(id, &group, sec) {
+	if !verifyMemberValidAndInGroup(id, &group, sec) {
 		return nil, NoSufficientPermissions
 	}
 
@@ -176,7 +165,7 @@ func (r MongoRepository) KickMember(id string, sec SecurityPile) (*Group, error)
 	query := r.db.C("groups").Find(bson.M{"members.id": id})
 	query.One(&group)
 
-	if verifyMember(id, &group, sec) {
+	if verifyMemberValidAndInGroup(id, &group, sec) {
 		// Everything's right
 	} else if checkAdminPermissions(&group, sec) {
 		// Everything's right too
@@ -196,14 +185,14 @@ func (r MongoRepository) KickMember(id string, sec SecurityPile) (*Group, error)
 	return &group, nil
 }
 
-func (r MongoRepository) memberWithAndroidIdExists(group *Group, androidId string) (bool, string) {
+func (r MongoRepository) memberWithAndroidIdExists(group *Group, androidId string) bool {
 	for _, member := range group.Members {
 		if member.AndroidId == androidId {
-			return true, member.Id
+			return true
 		}
 	}
 
-	return false, ""
+	return false
 }
 
 func checkMemberPermissionsToGroup(group *Group, sec SecurityPile) bool {
@@ -216,7 +205,7 @@ func checkMemberPermissionsToGroup(group *Group, sec SecurityPile) bool {
 	return false
 }
 
-func verifyMember(memberId string, group *Group, sec SecurityPile) bool {
+func verifyMemberValidAndInGroup(memberId string, group *Group, sec SecurityPile) bool {
 	for _, member := range group.Members {
 		if member.Id == memberId {
 			if member.Secret == sec.Secret && member.AndroidId == sec.AndroidId {

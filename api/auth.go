@@ -55,7 +55,8 @@ func (j TokenManager) TokenMiddleware(next http.Handler) http.Handler {
 
 		jwtToken, err := jwt.FromString(split[1])
 		if err != nil {
-			logger.Warningf("error when retrieving JWT token: %s", err)
+			logger.Warningf("[1]error when retrieving JWT token: %s", err)
+			logger.Warningf("[2]token: %s", split[1])
 
 			w.WriteHeader(http.StatusUnauthorized)
 			return
