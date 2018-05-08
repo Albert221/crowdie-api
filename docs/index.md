@@ -112,7 +112,7 @@ Joining existing group can happen in one of two cases:
 
 In the first case, situation is almost exactly same as with creating new group, but the difference is that we specify the group id. Same response is returned as in the mentioned endpoint.
 
-In the second case, if the user has already been a member of given group (i.e. one's android id was present in group's members' android ids), a valid security token of this user must be provided. Otherwise, an `401 Unauthorized` or `403 Forbidden` will be returned, respectively to the lack of token or the token of wrong user.
+In the second case, a `403 Forbidden` will be returned. This case can happen only in one of a few edge-cases that aren't supposed to happen in normal usage of an app.
 
 This endpoint will return a `404 Not Found` when the given group does not exist.
 
@@ -130,24 +130,7 @@ Content-Type: application/json
 }
 ```
 
-#### Request for second case
-
-```http
-POST /group/c0c83e12-5ebb-4626-bb8f-80778ef15b49/member
-Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6I...
-
-{
-    "name": "John Doe",
-    "androidId": "8a416d2cb454759a",
-    "lat": 62.96398,
-    "lng": 87.57387
-}
-```
-
 #### Response
-
-In the second case, `yourId` and `token` keys will not be returned.
 
 ```http
 HTTP/1.1 201 Created
