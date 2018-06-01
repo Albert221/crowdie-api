@@ -72,8 +72,8 @@ func NewMember(name, androidId string, lat, lng float32) Member {
 }
 
 var (
-	GroupNotExists = errors.New("group does not exist")
+	GroupNotExists = errors.New("group does not exist") // 3
 
-	MemberNotExists         = errors.New("member does not exist")
-	NoSufficientPermissions = errors.New("member does not have sufficient permissions")
+	MemberNotExists         = errors.New("member does not exist") // 1
+	NoSufficientPermissions = errors.New("member does not have sufficient permissions") // 2
 )

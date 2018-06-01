@@ -2,11 +2,11 @@ package api
 
 import (
 	"net/http"
-	"strings"
 	"github.com/gbrlsnchs/jwt"
 	"github.com/google/logger"
 	"context"
 	"fmt"
+	"net/url"
 )
 
 const ContextJwt = "jwt"
@@ -39,24 +39,21 @@ func (j TokenManager) CreateToken(secret, androidId string) (string, error) {
 
 func (j TokenManager) TokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authentication")
+		queryParams, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			return
+		}
 
-		if authHeader == "" {
-			// If Authentication header isn't provided, proceed to next handler
+		token := queryParams.Get("token")
+		if token == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		split := strings.Split(authHeader, " ")
-		if len(split) != 2 {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		jwtToken, err := jwt.FromString(split[1])
+		jwtToken, err := jwt.FromString(token)
 		if err != nil {
 			logger.Warningf("[1]error when retrieving JWT token: %s", err)
-			logger.Warningf("[2]token: %s", split[1])
+			logger.Warningf("[2]token: %s", token)
 
 			w.WriteHeader(http.StatusUnauthorized)
 			return

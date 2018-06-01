@@ -5,23 +5,32 @@ import (
 	"net/http"
 	"time"
 	"wolszon.me/groupie/api"
-	"wolszon.me/groupie/domain"
 	"fmt"
 	"os"
 	"github.com/google/logger"
+	"wolszon.me/groupie/domain"
 )
 
+var apiController api.ApiController
+
 func main() {
-	logFile, _ := os.OpenFile("log.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0664)
+	logFile, err := os.OpenFile("log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0664)
+	if err != nil {
+		logger.Errorf("error opening file: %s", err)
+	}
 	defer logFile.Close()
 
 	logger.Init("Main", false, false, logFile)
 
 	envs := getEnvs()
 
-	api.Repository = domain.NewRepository(envs["GROUPIE_MONGO_URL"], envs["GROUPIE_DATABASE"])
+	apiController = api.NewApiController(
+		domain.NewRepository(envs["GROUPIE_MONGO_URL"], envs["GROUPIE_DATABASE"]),
+		api.NewTokenManager(envs["GROUPIE_JWT_SECRET"]),
+	)
 
-	srv := setupHttp(envs["GROUPIE_PORT"], envs["GROUPIE_JWT_SECRET"])
+	srv := setupHttp(envs["GROUPIE_PORT"])
+	fmt.Println("I'm up and running!")
 	logger.Fatal(srv.ListenAndServe())
 }
 
@@ -39,38 +48,23 @@ func getEnvs() (r map[string]string) {
 	return
 }
 
-func setupHttp(port, jwtSecret string) *http.Server {
+func setupHttp(port string) *http.Server {
 	r := mux.NewRouter()
 
-	tokenManager := api.NewTokenManager(jwtSecret)
-	api.ApiTokenManager = tokenManager
-
 	apiRoutes := r.PathPrefix("/api/v1").Subrouter()
-	apiRoutes.Use(tokenManager.TokenMiddleware)
+	apiRoutes.Use(apiController.GetMiddleware())
 
-	apiRoutes.HandleFunc("/group", api.NewGroup).
+	apiRoutes.HandleFunc("/group", apiController.NewGroup).
 		Methods("POST").
 		Name("group.create")
 
-	apiRoutes.HandleFunc("/group/{id}", api.GetGroup).
-		Methods("GET").
-		Name("group.get")
-
-	apiRoutes.HandleFunc("/group/{id}/member", api.AddMemberToGroup).
+	apiRoutes.HandleFunc("/group/{id}", apiController.JoinGroup).
 		Methods("POST").
-		Name("group.addMember")
+		Name("group.join")
 
-	apiRoutes.HandleFunc("/member/{id}/role", api.UpdateMemberRole).
-		Methods("PATCH").
-		Name("member.updateRole")
-
-	apiRoutes.HandleFunc("/member/{id}/coords-bit", api.SendMemberCoordBit).
-		Methods("PATCH").
-		Name("member.coordsBit")
-
-	apiRoutes.HandleFunc("/member/{id}", api.KickMember).
-		Methods("DELETE").
-		Name("member.kick")
+	apiRoutes.HandleFunc("/group/{id}", apiController.Endpoint).
+		Methods("GET").
+		Name("group.endpoint")
 
 	return &http.Server{
 		Handler:      r,
